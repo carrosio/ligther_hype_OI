@@ -39,8 +39,8 @@ def calculate_ratio(df):
         values='Open Interest (Millions USD)'
     )
     
-    # Fill any missing values (due to scrape errors) with 0.0 for calculation
-    pivot_df = pivot_df.fillna(0.0)
+    # Fill missing and zero values with most recent available data
+    pivot_df = pivot_df.replace(0.0, pd.NA).fillna(method='ffill')
 
     # 2. Calculate the Sum of OI for Lighter (BTC + ETH) and Hyperliquid (BTC + ETH)
     lighter_cols = [(p, a) for p, a in pivot_df.columns if p == 'Lighter']

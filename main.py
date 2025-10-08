@@ -114,61 +114,71 @@ def scrape_market(platform: str, pair: str, page) -> float:
 
 def main():
     """Main function to initialize, schedule, and execute the scraping process."""
-    
+
     print("--- DeFi OI Monitor: Starting 5-Minute Scrape Cycle ---")
     init_csv_file()
-    
-    with sync_playwright() as p:
-        # Launch browser once outside the loop
-        print("Launching Chromium browser...")
+
+    max_retries = 3
+    retry_count = 0
+
+    while retry_count < max_retries:
         try:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+            with sync_playwright() as p:
+                print("Launching Chromium browser...")
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                page.set_default_timeout(OI_ELEMENT_TIMEOUT_MS)
+                retry_count = 0
 
-            while True:
-                start_time = time.time()
-                # Using datetime.datetime.now(datetime.UTC) to fix the DeprecationWarning
-                timestamp_utc = datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')
-                print(f"\n--- Cycle Start: {timestamp_utc} UTC ---")
-                
-                cycle_data = []
+                while True:
+                    start_time = time.time()
+                    timestamp_utc = datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')
+                    print(f"\n--- Cycle Start: {timestamp_utc} UTC ---")
 
-                # --- Loop through all platforms and pairs ---
-                for platform, config in PLATFORM_CONFIG.items():
-                    for pair in config['pairs']:
-                        oi_millions = scrape_market(platform, pair, page)
-                        
-                        # Store data for batch writing
-                        cycle_data.append([timestamp_utc, platform, pair, oi_millions])
+                    cycle_data = []
 
-                # --- Save to CSV ---
-                with open(CSV_FILE, 'a', newline='') as f:
-                    writer = csv.writer(f)
-                    writer.writerows(cycle_data)
-                print(f"Successfully saved {len(cycle_data)} records to {CSV_FILE}.")
-                
-                # --- Wait for the next cycle ---
-                end_time = time.time()
-                elapsed_time = end_time - start_time
-                wait_time = max(0, SCRAPE_INTERVAL_SECONDS - elapsed_time)
-                
-                next_run_time = datetime.datetime.now() + datetime.timedelta(seconds=wait_time)
-                print(f"Cycle completed in {elapsed_time:.2f} seconds.")
-                print(f"Waiting {wait_time:.0f} seconds (next run at {next_run_time:%H:%M:%S})...")
-                
-                time.sleep(wait_time)
+                    for platform, config in PLATFORM_CONFIG.items():
+                        for pair in config['pairs']:
+                            try:
+                                oi_millions = scrape_market(platform, pair, page)
+                                cycle_data.append([timestamp_utc, platform, pair, oi_millions])
+                            except Exception as e:
+                                print(f"    -> ERROR scraping {platform} {pair}: {e}. Using 0.0.")
+                                cycle_data.append([timestamp_utc, platform, pair, 0.0])
+
+                    with open(CSV_FILE, 'a', newline='') as f:
+                        writer = csv.writer(f)
+                        writer.writerows(cycle_data)
+                    print(f"Successfully saved {len(cycle_data)} records to {CSV_FILE}.")
+
+                    end_time = time.time()
+                    elapsed_time = end_time - start_time
+                    wait_time = max(0, SCRAPE_INTERVAL_SECONDS - elapsed_time)
+
+                    next_run_time = datetime.datetime.now() + datetime.timedelta(seconds=wait_time)
+                    print(f"Cycle completed in {elapsed_time:.2f} seconds.")
+                    print(f"Waiting {wait_time:.0f} seconds (next run at {next_run_time:%H:%M:%S})...")
+
+                    time.sleep(wait_time)
 
         except KeyboardInterrupt:
             print("\n\nScraper stopped by user (Ctrl+C).")
+            break
         except Exception as e:
-            if "Connection closed while reading from the driver" in str(e):
-                 print("\n\nPlaywright Connection closed unexpectedly. Exiting gracefully.")
+            retry_count += 1
+            print(f"\n\nERROR: {e}")
+            if retry_count < max_retries:
+                print(f"Restarting browser... (Attempt {retry_count}/{max_retries})")
+                time.sleep(10)
             else:
-                 print(f"\n\nFATAL ERROR: {e}")
+                print(f"Max retries ({max_retries}) reached. Exiting.")
         finally:
-            if 'browser' in locals() and browser:
-                browser.close()
-                print("Browser closed.")
+            try:
+                if 'browser' in locals() and browser:
+                    browser.close()
+                    print("Browser closed.")
+            except:
+                pass
 
 if __name__ == "__main__":
     main()
