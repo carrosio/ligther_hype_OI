@@ -1,0 +1,5 @@
+defi_oi_data.csv
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
