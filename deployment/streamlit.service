@@ -1,0 +1,17 @@
+[Unit]
+Description=DeFi OI Streamlit Dashboard
+After=network.target scraper.service
+
+[Service]
+Type=simple
+User=defioi
+WorkingDirectory=/opt/defi-oi-monitor
+Environment="PATH=/opt/defi-oi-monitor/venv/bin"
+ExecStart=/opt/defi-oi-monitor/venv/bin/streamlit run streamlit_app.py --server.port 8501 --server.address 127.0.0.1 --server.maxUploadSize 1 --server.maxMessageSize 1
+Restart=always
+RestartSec=10
+MemoryMax=512M
+MemoryHigh=400M
+
+[Install]
+WantedBy=multi-user.target

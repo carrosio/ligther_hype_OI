@@ -1,0 +1,15 @@
+[Unit]
+Description=DeFi OI Data Scraper
+After=network.target
+
+[Service]
+Type=simple
+User=defioi
+WorkingDirectory=/opt/defi-oi-monitor
+Environment="PATH=/opt/defi-oi-monitor/venv/bin"
+ExecStart=/opt/defi-oi-monitor/venv/bin/python api_version/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

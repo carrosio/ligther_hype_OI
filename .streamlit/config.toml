@@ -1,2 +1,12 @@
 [server]
 headless = true
+enableCORS = false
+enableXsrfProtection = true
+maxUploadSize = 1
+
+[browser]
+gatherUsageStats = false
+
+[runner]
+fastReruns = true
+magicEnabled = false
